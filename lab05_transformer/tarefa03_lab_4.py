@@ -41,9 +41,7 @@ class Decoder(nn.Module):
         for layer in self.layers:
             y = layer(y, z, mask_causal, mask_encoder)
         
-        logits = self.linear_saida(y)
-        
-        return F.softmax(logits, dim=-1)
+        return self.linear_saida(y)
 
 
 
