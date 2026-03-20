@@ -33,7 +33,7 @@ Projeto final da **Unidade I** — conecta a arquitetura Transformer construída
 ### 1. Clone o repositório
 
 ```bash
-git clone <url-do-repositorio>
+git clone https://github.com/Gabrilinard/LAB_5
 cd lab05_transformer
 ```
 
