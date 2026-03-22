@@ -10,6 +10,7 @@ Projeto final da **Unidade I** — conecta a arquitetura Transformer construída
 - [Instalação](#instalação)
 - [Estrutura de Arquivos](#estrutura-de-arquivos)
 - [Arquitetura do Modelo](#arquitetura-do-modelo)
+- [Correção Aplicada — tarefa03\_lab\_4.py](#correção-aplicada--tarefa03_lab_4py)
 - [Como Executar](#como-executar)
 - [Tarefa 1 — Dataset](#tarefa-1--dataset-hugging-face)
 - [Tarefa 2 — Tokenização](#tarefa-2--tokenização-básica)
@@ -80,7 +81,7 @@ lab05_transformer/
 │
 ├── tarefa01_lab_4.py             # [Lab4] AtencaoMultihead, FeedForward, AddNorm
 ├── tarefa02_lab_4.py             # [Lab4] EncoderBlock, Encoder
-├── tarefa03_lab_4.py             # [Lab4] DecoderBlock, Decoder
+├── tarefa03_lab_4.py             # [Lab4] DecoderBlock, Decoder  ← corrigido
 ├── tarefa04_lab_4.py             # [Lab4] TransformerCompleto + loop auto-regressivo
 │
 ├── tarefa01_dataset.py           # [Lab5-T1] Carrega dataset multi30k (Hugging Face)
@@ -133,6 +134,46 @@ Linear (d_model → vocab_size)
 Logits  →  CrossEntropyLoss durante treino
         →  argmax durante inferência
 ```
+
+---
+
+## Correção Aplicada — tarefa03_lab_4.py
+
+Durante o desenvolvimento, foi identificado e corrigido um bug no método `forward` da classe `Decoder`.
+
+### Código original (com bug)
+
+```python
+def forward(self, y, z, mask_causal=None, mask_encoder=None):
+    for layer in self.layers:
+        y = layer(y, z, mask_causal, mask_encoder)
+
+    logits = self.linear_saida(y)
+
+    return F.softmax(logits, dim=-1)
+```
+
+### Código corrigido
+
+```python
+def forward(self, y, z, mask_causal=None, mask_encoder=None):
+    for layer in self.layers:
+        y = layer(y, z, mask_causal, mask_encoder)
+
+    return self.linear_saida(y)
+```
+
+### Por que isso era um bug?
+
+O `CrossEntropyLoss` do PyTorch **já aplica softmax internamente** antes de calcular a perda — ele foi projetado para receber logits crus (números sem normalização).
+
+Ao aplicar `F.softmax` antes de passar os valores para a loss, o softmax era aplicado **duas vezes**: uma pelo código e outra internamente pelo `CrossEntropyLoss`. Isso comprimia todos os valores para o intervalo (0, 1) e os forçava a somar 1, resultando em uma distribuição muito mais achatada e menos informativa. O efeito prático era um gradiente envenenado, fazendo o modelo aprender de forma incorreta e muito mais lenta do que deveria.
+
+Além disso, o código original calculava `self.linear_saida(y)` duas vezes — uma salvando em `logits` (que era ignorado) e outra no `return` — desperdício eliminado na correção.
+
+A regra geral no PyTorch é:
+- `CrossEntropyLoss` → recebe **logits crus**
+- O `softmax` ou `argmax` só é aplicado **após** a loss, durante a inferência
 
 ---
 
@@ -300,7 +341,7 @@ O Loss caiu **91.5%** entre a primeira e a última época, demonstrando que os g
 
 **Arquivo:** `tarefa04_overfitting.py`
 
-Técnica clássica de debugging de redes neurais: forçar o modelo a memorizar um conjunto mínimo de dados para provar que a arquitetura e o fluxo de gradientes estão corretos. Um modelo pequeno é treinado por **1000 épocas** sobre apenas **8 frases**, e ao final o loop auto-regressivo é usado para gerar a tradução de uma das frases vistas no treino.
+Técnica clássica de debugging de redes neurais: forçar o modelo a memorizar um conjunto mínimo de dados para provar que a arquitetura e o fluxo de gradientes estão corretos. Um modelo pequeno é treinado por **500 épocas** sobre apenas **8 frases**, e ao final o loop auto-regressivo é usado para gerar a tradução de uma das frases vistas no treino.
 
 ### Hiperparâmetros
 
@@ -329,10 +370,10 @@ A geração da tradução funciona token a token:
 ```
 Modelo criado com 7.813.307 parametros treinaveis.
 
-Iniciando Overfitting em 8 frases por 1000 epocas...
+Iniciando Overfitting em 8 frases por 500 epocas...
  Epoca | Erro (Loss)
 -------------------------
-    1  |    11.8492
+     1 |    11.8492
    100 |     4.6949
    200 |     1.3908
    300 |     0.3302
@@ -353,7 +394,7 @@ O modelo reproduziu a tradução **exata** da frase vista no treino, confirmando
 
 ## Ferramentas de IA Utilizadas
 
-- **Claude (Anthropic)** — auxiliou na estruturação dos arquivos das Tarefas 1 e 2, na correção de bugs e na escrita do README, conforme permitido pelo enunciado.
+- **Claude (Anthropic)** — auxiliou na estruturação dos arquivos das Tarefas 1 e 2, na identificação e correção de bugs, e na escrita do README, conforme permitido pelo enunciado.
 - O fluxo de Forward/Backward da Tarefa 3 interage estritamente com as classes construídas nos laboratórios anteriores.
 
 ---
